@@ -40,7 +40,7 @@ namespace NexusForever.Database.Auth
                 foreach (string migration in migrations)
                     log.Info(migration);
 
-                context.Database.Migrate();
+//                context.Database.Migrate(); // Disabled to avoid conflicts with manual SQL schema
             }
         }
 
