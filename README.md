@@ -157,6 +157,10 @@ cd "C:\Program Files (x86)\NCSOFT\WildStar\Client64"
 
 On the retail-launcher install this was tested with, the arguments were ignored and the client still tried NCSoft's servers, so Method 1 is the one to rely on. Your mileage may vary with other client installs. `Source/NexusForever.ClientConnector` (a small .NET Framework launcher) does the same thing as this command.
 
+### Adding the client to Steam (optional)
+
+In Steam: **Add a Game** → **Add a Non-Steam Game...** → **Browse...**, set the filter to *All Files*, pick the launcher `WildStar.exe` in the install root (not `Client64\WildStar64.exe`), then **Add Selected Programs**. The hosts-file redirect is system-wide, so nothing else is needed. Steam's overlay and Steam Input do not attach to this client.
+
 ## Day-to-day operation
 
 ```bash
@@ -254,6 +258,7 @@ Start with `./setup.sh --check` (container status plus the auth-to-world reachab
 | `Could not find file '/data/map/....nfmap'` | A map is missing. Regenerate with `-g`, or copy all of `map/` |
 | Client: *"Cannot connect to NCSoft login services"* | The client is not being redirected. Use the [hosts file method](#method-1-hosts-file-redirect-recommended), as administrator, and add every host the message lists |
 | Client login screen says **"No realms are available at this time"** | You are logged in, but the auth server thinks the world server is offline. It checks by opening a TCP connection to `REALM_HOST:24000` **from inside its container**. Usually a host firewall blocks container to host traffic. With ufw: `sudo ufw allow from <docker subnet> to any port 24000 proto tcp` (`./setup.sh` finds the subnet and offers this). If `REALM_HOST` is a DNS name, it must resolve to the host from inside the container. Right after a restart it can also take up to about 15 seconds |
+| Windows error *"The instruction at ... referenced memory at ... could not be read"* when closing the client | A known crash of the 64-bit client on exit. It happens after you have already quit and does not affect the server or your character, so click OK |
 | Login fails with a wrong-credentials error | No such account or wrong password. Create it with `scripts/create-account.sh`. Emails are lower-case |
 | `Realm id 1 doesn't exist in the database` | `REALM_HOST` is empty, so the realm row was not created. Set it in `.env`, `docker compose up -d` |
 | `Access denied` for the database user after editing `.env` | You changed a DB password after the first start. See *Resetting* |
