@@ -38,12 +38,14 @@ services:
       Database__World__Provider: MySql
       GameTablePath: /data/tbl
       Map__MapPath: /data/map
+      CachePath: /cache
       RealmId: ${REALM_ID:-1}
       NF_REALM_HOST: ${REALM_HOST}
       NF_REALM_NAME: ${REALM_NAME:-NexusForever}
     volumes:
       - ./data/tbl:/data/tbl:ro
       - ./data/map:/data/map:ro
+      - world-cache:/cache
     ports:
       - "${BIND_IP:-0.0.0.0}:24000:24000"
     # `docker attach nexusforever-world-1` gives you the server console (detach with Ctrl-p Ctrl-q). Headless without it.
@@ -81,3 +83,4 @@ services:
 
 volumes:
   db-data:
+  world-cache:

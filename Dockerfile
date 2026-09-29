@@ -13,7 +13,9 @@ ARG PROJECT
 ENV APP_DLL="NexusForever.${PROJECT}.dll" \
     DOTNET_gcServer=0 \
     DOTNET_TieredPGO=0
-RUN useradd --system --uid 10001 --no-create-home nf
+# /cache holds the parsed game-table cache (WorldServer writes it); /app must be writable by nf for config/logs.
+RUN useradd --system --uid 10001 --no-create-home nf \
+ && mkdir -p /app /cache && chown nf:nf /app /cache
 WORKDIR /app
 COPY --from=build --chown=nf:nf /out/ ./
 USER nf
