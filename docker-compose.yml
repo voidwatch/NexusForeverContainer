@@ -53,7 +53,7 @@ services:
     tty: true
     stop_grace_period: 20s
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/24000"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/24000"]   # /dev/tcp is bash-only; sh is dash here
       interval: 10s
       timeout: 3s
       retries: 30
