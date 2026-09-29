@@ -48,7 +48,8 @@ services:
       - world-cache:/cache
     ports:
       - "${BIND_IP:-0.0.0.0}:24000:24000"
-    # `docker attach nexusforever-world-1` gives you the server console (detach with Ctrl-p Ctrl-q). Headless without it.
+    # Server console: docker attach --sig-proxy=false --detach-keys=ctrl-x nexusforever-world-1   (Ctrl-X detaches; never Ctrl-C).
+    # The server also runs fine headless when nothing is attached.
     stdin_open: true
     tty: true
     stop_grace_period: 20s

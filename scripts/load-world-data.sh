@@ -6,11 +6,18 @@
 # written in 2024+ for a newer NexusForever schema (entity_event, creature_info, ...) that this fork does not have.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-set -a; . ./.env; set +a
+set -a
+# shellcheck disable=SC1091
+. ./.env
+set +a
 SRC="${1:-./world-data}"
-if [ ! -d "$SRC" ]; then
-  git clone --depth 1 https://github.com/NexusForever/NexusForever.WorldDatabase "$SRC"
+# Last upstream revision that matches this fork's schema (2021-03). The zone files loaded below have not changed since.
+REF="${WORLD_DATA_REF:-1e5ff92}"
+if [ ! -d "$SRC/.git" ]; then
+  git clone https://github.com/NexusForever/NexusForever.WorldDatabase "$SRC"
 fi
+git -C "$SRC" fetch --quiet --unshallow 2>/dev/null || true
+git -C "$SRC" checkout --quiet "$REF"
 find "$SRC/Alizar" "$SRC/Isigrol" "$SRC/Olyssia" -name '*.sql' | sort | while read -r f; do
   echo "applying $f"
   docker compose exec -T db mariadb -u"$DB_USER" -p"$DB_PASSWORD" nexus_forever_world < "$f"

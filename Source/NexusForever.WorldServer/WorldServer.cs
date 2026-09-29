@@ -5,6 +5,7 @@ using System.Threading;
 using NLog;
 using NexusForever.Shared;
 using NexusForever.Shared.Configuration;
+using NexusForever.Shared.Cryptography;
 using NexusForever.Shared.Database;
 using NexusForever.Shared.Game;
 using NexusForever.Shared.GameTable;
@@ -75,6 +76,26 @@ namespace NexusForever.WorldServer
                 ushort realmPort = ConfigurationManager<WorldServerConfiguration>.Instance.Config.Network.Port;
                 log.Info($"Registering realm {RealmId} \"{realmName}\" at {realmHost}:{realmPort}");
                 DatabaseManager.Instance.AuthDatabase.EnsureRealm((byte)RealmId, realmName, realmHost, realmPort);
+            }
+
+            // one-shot mode used by setup.sh: create an account from the environment and exit before any game data is loaded
+            string newAccountEmail    = Environment.GetEnvironmentVariable("NF_CREATE_ACCOUNT_EMAIL");
+            string newAccountPassword = Environment.GetEnvironmentVariable("NF_CREATE_ACCOUNT_PASSWORD");
+            if (!string.IsNullOrWhiteSpace(newAccountEmail) && !string.IsNullOrEmpty(newAccountPassword))
+            {
+                newAccountEmail = newAccountEmail.Trim().ToLowerInvariant();
+                if (DatabaseManager.Instance.AuthDatabase.AccountExists(newAccountEmail))
+                {
+                    log.Warn($"Account {newAccountEmail} already exists.");
+                    LogManager.Shutdown();
+                    Environment.Exit(2);
+                }
+
+                (string salt, string verifier) = PasswordProvider.GenerateSaltAndVerifier(newAccountEmail, newAccountPassword);
+                DatabaseManager.Instance.AuthDatabase.CreateAccount(newAccountEmail, salt, verifier);
+                log.Info($"Account {newAccountEmail} created successfully.");
+                LogManager.Shutdown();
+                Environment.Exit(0);
             }
 
             // RBACManager must be initialised before CommandManager
