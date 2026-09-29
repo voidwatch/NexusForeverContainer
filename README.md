@@ -10,16 +10,11 @@ A server emulator for WildStar written in C# that supports build 16042.
  * [Discord](https://discord.gg/8wT3GEQ)
  * [World Database](https://github.com/NexusForever/NexusForever.WorldDatabase)
 
-## Build Status
-
-### Linux
-
-
 ## Running with Docker (self-hosted)
 
-Untested against a live client: see "Status" below.
+Docker only (Docker Engine 24+ with the `docker compose` v2 plugin). Podman is not supported or tested.
 
-Requirements: Docker + compose plugin, and **your own WildStar client data** (not distributable):
+Requirements: **your own WildStar client data** (not distributable):
 * `data/tbl/`: the extracted `.tbl` game tables and `.bin` text tables (build 16042)
 * `data/map/`: the `.nfmap` base maps generated with `NexusForever.MapGenerator` from your client
 
@@ -46,4 +41,11 @@ Notes
 * `WorldServer` is the only service that migrates the schema, so `auth`/`sts` wait for it to be healthy.
 * Config comes from the bundled `*.example.json` plus environment overrides (`Database__Auth__ConnectionString`, `Map__MapPath`, `GameTablePath`, ...), see `docker-compose.yml`.
 * `NF_SKIP_MIGRATIONS=1` disables EF migrations if you manage the schema by hand.
+* Docker Engine's default `json-file` logging has no size cap. Add `logging: {driver: json-file, options: {max-size: 10m, max-file: "3"}}` to services if disk matters.
 * Backups: `docker compose exec db mariadb-dump -uroot -p"$DB_ROOT_PASSWORD" --all-databases > backup.sql`
+
+## Status
+
+Fork of [NexusForever](https://github.com/NexusForever/NexusForever) with a Docker setup on top. The Docker files have been statically checked only (compose config parses, scripts pass `bash -n`); the images have not yet been built and run against a live WildStar client. Expect first-run fixes and please open an issue with the `docker compose logs` output if something fails.
+
+Base runtime is .NET 5 (end-of-life), pinned because the code targets EF Core 5. Do not expose the server to untrusted networks beyond the three game ports.
