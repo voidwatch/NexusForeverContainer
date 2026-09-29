@@ -44,6 +44,12 @@ namespace NexusForever.Database.Character
 
         public void Migrate()
         {
+            if (Environment.GetEnvironmentVariable("NF_SKIP_MIGRATIONS") == "1")
+            {
+                log.Warn("NF_SKIP_MIGRATIONS=1, not touching the database schema.");
+                return;
+            }
+
             using var context = new CharacterContext(config);
 
             List<string> migrations = context.Database.GetPendingMigrations().ToList();
@@ -53,7 +59,7 @@ namespace NexusForever.Database.Character
                 foreach (string migration in migrations)
                     log.Info(migration);
 
-//                context.Database.Migrate(); // Disabled to avoid conflicts with manual SQL schema
+                context.Database.Migrate();
             }
         }
 

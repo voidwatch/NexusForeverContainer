@@ -1,0 +1,83 @@
+name: nexusforever
+
+x-db-env: &db-env
+  Database__Auth__ConnectionString: "server=db;port=3306;user=${DB_USER};password=${DB_PASSWORD};database=nexus_forever_auth"
+  Database__Auth__Provider: MySql
+
+services:
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/mariadb-init.sh:/docker-entrypoint-initdb.d/10-nexusforever.sh:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    # DB is only reachable from the compose network. No published port on purpose.
+
+  # WorldServer owns the schema: it applies EF migrations to all three databases and registers the realm row.
+  world:
+    build: { context: ., args: { PROJECT: WorldServer } }
+    image: nexusforever-world:local
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      <<: *db-env
+      Database__Character__ConnectionString: "server=db;port=3306;user=${DB_USER};password=${DB_PASSWORD};database=nexus_forever_character"
+      Database__Character__Provider: MySql
+      Database__World__ConnectionString: "server=db;port=3306;user=${DB_USER};password=${DB_PASSWORD};database=nexus_forever_world"
+      Database__World__Provider: MySql
+      GameTablePath: /data/tbl
+      Map__MapPath: /data/map
+      RealmId: ${REALM_ID:-1}
+      NF_REALM_HOST: ${REALM_HOST}
+      NF_REALM_NAME: ${REALM_NAME:-NexusForever}
+    volumes:
+      - ./data/tbl:/data/tbl:ro
+      - ./data/map:/data/map:ro
+    ports:
+      - "${BIND_IP:-0.0.0.0}:24000:24000"
+    # `docker attach nexusforever-world-1` gives you the server console (detach with Ctrl-p Ctrl-q). Headless without it.
+    stdin_open: true
+    tty: true
+    stop_grace_period: 20s
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/24000"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 180s   # loading .tbl tables + maps is slow
+
+  auth:
+    build: { context: ., args: { PROJECT: AuthServer } }
+    image: nexusforever-auth:local
+    restart: unless-stopped
+    depends_on:
+      world: { condition: service_healthy }   # schema must exist first
+    environment:
+      <<: *db-env
+    ports:
+      - "${BIND_IP:-0.0.0.0}:23115:23115"
+
+  sts:
+    build: { context: ., args: { PROJECT: StsServer } }
+    image: nexusforever-sts:local
+    restart: unless-stopped
+    depends_on:
+      world: { condition: service_healthy }
+    environment:
+      <<: *db-env
+    ports:
+      - "${BIND_IP:-0.0.0.0}:6600:6600"
+
+volumes:
+  db-data:

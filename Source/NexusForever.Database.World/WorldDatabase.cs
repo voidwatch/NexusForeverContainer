@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,12 @@ namespace NexusForever.Database.World
 
         public void Migrate()
         {
+            if (Environment.GetEnvironmentVariable("NF_SKIP_MIGRATIONS") == "1")
+            {
+                log.Warn("NF_SKIP_MIGRATIONS=1, not touching the database schema.");
+                return;
+            }
+
             using var context = new WorldContext(config);
 
             List<string> migrations = context.Database.GetPendingMigrations().ToList();
@@ -31,7 +38,7 @@ namespace NexusForever.Database.World
                 foreach (string migration in migrations)
                     log.Info(migration);
 
-//                context.Database.Migrate(); // Disabled to avoid conflicts with manual SQL schema
+                context.Database.Migrate();
             }
         }
 

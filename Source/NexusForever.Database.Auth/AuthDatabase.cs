@@ -31,6 +31,12 @@ namespace NexusForever.Database.Auth
 
         public void Migrate()
         {
+            if (Environment.GetEnvironmentVariable("NF_SKIP_MIGRATIONS") == "1")
+            {
+                log.Warn("NF_SKIP_MIGRATIONS=1, not touching the database schema.");
+                return;
+            }
+
             using var context = new AuthContext(config);
 
             List<string> migrations = context.Database.GetPendingMigrations().ToList();
@@ -40,7 +46,7 @@ namespace NexusForever.Database.Auth
                 foreach (string migration in migrations)
                     log.Info(migration);
 
-//                context.Database.Migrate(); // Disabled to avoid conflicts with manual SQL schema
+                context.Database.Migrate();
             }
         }
 
@@ -145,6 +151,35 @@ namespace NexusForever.Database.Auth
             EntityEntry<AccountModel> entity = context.Attach(account);
             entity.Property(p => p.SessionKey).IsModified = true;
             await context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Creates or updates the realm row (auth database <c>server</c> table) so a fresh install can start without manual SQL.
+        /// The host is what game clients are told to connect to, it must be reachable from the client, not from the container.
+        /// </summary>
+        public void EnsureRealm(byte id, string name, string host, ushort port)
+        {
+            using var context = new AuthContext(config);
+            ServerModel realm = context.Server.SingleOrDefault(s => s.Id == id);
+            if (realm == null)
+            {
+                context.Server.Add(new ServerModel
+                {
+                    Id   = id,
+                    Name = name,
+                    Host = host,
+                    Port = port,
+                    Type = 0
+                });
+            }
+            else
+            {
+                realm.Name = name;
+                realm.Host = host;
+                realm.Port = port;
+            }
+
+            context.SaveChanges();
         }
 
         public ImmutableList<ServerModel> GetServers()

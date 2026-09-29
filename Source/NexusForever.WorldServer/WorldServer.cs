@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using NLog;
 using NexusForever.Shared;
 using NexusForever.Shared.Configuration;
@@ -66,6 +67,16 @@ namespace NexusForever.WorldServer
             DatabaseManager.Instance.Initialise(ConfigurationManager<WorldServerConfiguration>.Instance.Config.Database);
             DatabaseManager.Instance.Migrate();
 
+            // optional: create/update this realm's row in the auth database from the environment (used by the container setup)
+            string realmHost = Environment.GetEnvironmentVariable("NF_REALM_HOST");
+            if (!string.IsNullOrWhiteSpace(realmHost))
+            {
+                string realmName = Environment.GetEnvironmentVariable("NF_REALM_NAME") ?? "NexusForever";
+                ushort realmPort = ConfigurationManager<WorldServerConfiguration>.Instance.Config.Network.Port;
+                log.Info($"Registering realm {RealmId} \"{realmName}\" at {realmHost}:{realmPort}");
+                DatabaseManager.Instance.AuthDatabase.EnsureRealm((byte)RealmId, realmName, realmHost, realmPort);
+            }
+
             // RBACManager must be initialised before CommandManager
             RBACManager.Instance.Initialise();
             CommandManager.Instance.Initialise();
@@ -126,6 +137,16 @@ namespace NexusForever.WorldServer
                 {
                     Console.Write(">> ");
                     string line = Console.ReadLine();
+
+                    // stdin is closed or absent (container without -i, systemd, nohup), ReadLine returns null immediately
+                    // forever, which would spin a core and flood the command queue. Park the main thread instead,
+                    // the world and network threads keep running.
+                    if (line == null)
+                    {
+                        log.Info("No console input available, running headless.");
+                        Thread.Sleep(Timeout.Infinite);
+                    }
+
                     CommandManager.Instance.HandleCommandDelay(new ConsoleCommandContext(), line);
                 }
             }

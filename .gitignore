@@ -331,3 +331,10 @@ ASALocalRun/
 
 # Visual Studio profiling session file
 *.diagsession
+
+# container setup
+.env
+/data/tbl/*
+/data/map/*
+!/data/**/.gitkeep
+/world-data/
