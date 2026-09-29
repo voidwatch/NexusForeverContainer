@@ -177,7 +177,9 @@ start_stack() {
 }
 
 realm_reachable() {
-  timeout 8 docker compose exec -T auth bash -c "exec 3<>/dev/tcp/${REALM_HOST}/24000" >/dev/null 2>&1
+  # </dev/null and --foreground matter: plain `timeout` moves the command into a background process group, so when
+  # docker reads the terminal it is stopped by SIGTTIN and neither the timeout nor Ctrl-C can end it (the script hangs).
+  timeout --foreground -s KILL 8 docker compose exec -T auth bash -c "exec 3<>/dev/tcp/${REALM_HOST}/24000" </dev/null >/dev/null 2>&1
 }
 
 check_realm_reachable() {
