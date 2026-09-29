@@ -74,7 +74,8 @@ namespace NexusForever.WorldServer.Game.Map
         private MapFile LoadBaseMap(string assetPath)
         {
             string mapPath  = ConfigurationManager<WorldServerConfiguration>.Instance.Config.Map.MapPath;
-            string asset    = Path.Combine(mapPath, Path.GetFileName(assetPath));
+            // asset paths in the game tables use Windows separators (Map\Western), normalise so this also works on Linux
+            string asset    = Path.Combine(mapPath, Path.GetFileName(assetPath.Replace('\\', '/')));
             string filePath = Path.ChangeExtension(asset, ".nfmap");
 
             using FileStream stream = File.OpenRead(filePath);
