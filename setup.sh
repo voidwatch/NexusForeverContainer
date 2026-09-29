@@ -55,6 +55,17 @@ ok()   { echo "${G}ok${N}   $*"; }
 warn() { echo "${Y}warn${N} $*"; }
 die()  { echo "${R}error${N} $*" >&2; exit 1; }
 
+# Ctrl-C always ends the script (the stack keeps running, it is not stopped).
+trap 'echo; warn "Interrupted. Containers that were already started keep running (docker compose ps)."; exit 130' INT TERM
+
+# bounded SECONDS command...   Run a command that must not be allowed to hang: it is killed after SECONDS, stdin is /dev/null
+# (a command that reads the terminal from a background process group is stopped by SIGTTIN and can never be killed or
+# interrupted), and --foreground keeps it in the terminal's foreground group so Ctrl-C reaches it.
+bounded() {
+  local secs="$1"; shift
+  timeout --foreground -s KILL "$secs" "$@" </dev/null
+}
+
 # ask "question" default(y|n) -> 0 for yes
 ask() {
   local q="$1" def="${2:-n}" reply
@@ -72,9 +83,9 @@ detect_ip() {
 
 container_health() {
   local id
-  id="$(docker compose ps -q "$1" 2>/dev/null || true)"
+  id="$(bounded 20 docker compose ps -q "$1" 2>/dev/null || true)"
   [ -n "$id" ] || { echo "missing"; return; }
-  docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || echo "unknown"
+  bounded 20 docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || echo "unknown"
 }
 
 wait_healthy() {
@@ -82,11 +93,13 @@ wait_healthy() {
   while [ "$waited" -lt "$timeout" ]; do
     status="$(container_health "$svc")"
     case "$status" in
-      healthy) return 0 ;;
-      exited|dead) return 1 ;;
+      healthy) [ "$waited" -eq 0 ] || echo; return 0 ;;
+      exited|dead) echo; return 1 ;;
     esac
+    printf '.'
     sleep 5; waited=$((waited + 5))
   done
+  echo
   return 1
 }
 
@@ -179,7 +192,7 @@ start_stack() {
 realm_reachable() {
   # </dev/null and --foreground matter: plain `timeout` moves the command into a background process group, so when
   # docker reads the terminal it is stopped by SIGTTIN and neither the timeout nor Ctrl-C can end it (the script hangs).
-  timeout --foreground -s KILL 8 docker compose exec -T auth bash -c "exec 3<>/dev/tcp/${REALM_HOST}/24000" </dev/null >/dev/null 2>&1
+  bounded 8 docker compose exec -T auth bash -c "exec 3<>/dev/tcp/${REALM_HOST}/24000" >/dev/null 2>&1
 }
 
 check_realm_reachable() {
@@ -199,7 +212,13 @@ check_realm_reachable() {
       warn "If you use ufw, allow the stack's containers to reach the world port:"
       warn "  sudo ufw allow from $subnet to any port 24000 proto tcp"
     else
-      status="$($sudo_cmd ufw status 2>/dev/null | head -1 || true)"
+      status=""
+      if [ -z "$sudo_cmd" ] || sudo -n true 2>/dev/null; then
+        status="$(${sudo_cmd:+$sudo_cmd -n} ufw status 2>/dev/null | head -1 || true)"
+      else
+        warn "sudo needs a password to inspect ufw, so this step is skipped. If clients cannot log in, run:"
+        warn "  sudo ufw allow from $subnet to any port 24000 proto tcp"
+      fi
       if echo "$status" | grep -qi "status: active"; then
         if ask "ufw is active. Add 'ufw allow from $subnet to any port 24000 proto tcp' (this stack's containers only)?" y; then
           $sudo_cmd ufw allow from "$subnet" to any port 24000 proto tcp comment 'nexusforever containers to world' >/dev/null
@@ -216,7 +235,7 @@ check_realm_reachable() {
 
 world_data_loaded() {
   local n
-  n="$(docker compose exec -T -e MYSQL_PWD="$DB_PASSWORD" db mariadb -u"$DB_USER" -N -e 'SELECT COUNT(*) FROM nexus_forever_world.entity' 2>/dev/null | tr -d '[:space:]' || true)"
+  n="$(bounded 30 docker compose exec -T -e MYSQL_PWD="$DB_PASSWORD" db mariadb -u"$DB_USER" -N -e 'SELECT COUNT(*) FROM nexus_forever_world.entity' 2>/dev/null | tr -d '[:space:]' || true)"
   [ -n "$n" ] && [ "$n" -gt 0 ] 2>/dev/null
 }
 

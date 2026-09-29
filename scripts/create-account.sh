@@ -24,7 +24,7 @@ fi
 export NF_CREATE_ACCOUNT_EMAIL="$email"
 export NF_CREATE_ACCOUNT_PASSWORD="$password"
 set +e
-docker compose run --rm -T -e NF_CREATE_ACCOUNT_EMAIL -e NF_CREATE_ACCOUNT_PASSWORD world
+docker compose run --rm -T -e NF_CREATE_ACCOUNT_EMAIL -e NF_CREATE_ACCOUNT_PASSWORD world </dev/null
 rc=$?
 set -e
 unset NF_CREATE_ACCOUNT_EMAIL NF_CREATE_ACCOUNT_PASSWORD
